@@ -16,8 +16,10 @@ import { PrintSheetModal } from './components/PrintSheetModal';
 import { EXERCISES_DATA } from './data/trainingPlanData';
 import { Exercise, WorkoutLogEntry } from './types/training';
 import { Heart, Activity, ShieldCheck, Download, Award } from 'lucide-react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-export default function App() {
+function AppContent() {
+  const { currentUser, saveWorkoutLog } = useAuth();
   const [currentTab, setCurrentTab] = useState<'spreadsheet' | 'schedule' | 'injuries' | 'tracker'>('spreadsheet');
   const [selectedAthlete, setSelectedAthlete] = useState<'all' | 'arwel' | 'helen'>('all');
   const [activeVideoExercise, setActiveVideoExercise] = useState<Exercise | null>(null);
@@ -69,12 +71,16 @@ export default function App() {
     setIsPlayerOpen(true);
   };
 
-  const handleSessionComplete = (newLog: WorkoutLogEntry) => {
+  const handleSessionComplete = async (newLog: WorkoutLogEntry) => {
     try {
       const existing = localStorage.getItem('marathon_rehab_logs');
       const parsed = existing ? JSON.parse(existing) : [];
       const updated = [newLog, ...parsed];
       localStorage.setItem('marathon_rehab_logs', JSON.stringify(updated));
+
+      if (currentUser) {
+        await saveWorkoutLog(newLog);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -144,7 +150,7 @@ export default function App() {
 
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" /> Evidence-Based Physiotherapy
+              <ShieldCheck className="w-4 h-4 text-emerald-500" /> Firebase Cloud Firestore Enabled
             </span>
             <span className="flex items-center gap-1.5">
               <Award className="w-4 h-4 text-amber-500" /> Post-Marathon Periodization
@@ -176,5 +182,13 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

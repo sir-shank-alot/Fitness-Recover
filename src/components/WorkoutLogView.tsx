@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WorkoutLogEntry } from '../types/training';
-import { PlusCircle, Trash2, Activity, Calendar, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Trash2, Activity, Calendar, ShieldCheck, AlertTriangle, Cloud, CloudUpload, Check } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface WorkoutLogViewProps {
   selectedAthlete: 'all' | 'arwel' | 'helen';
@@ -13,6 +14,8 @@ export const WorkoutLogView: React.FC<WorkoutLogViewProps> = ({
 }) => {
   const [logs, setLogs] = useState<WorkoutLogEntry[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const { currentUser, cloudLogs, logsLoading, saveWorkoutLog, deleteWorkoutLog, syncLocalLogsToCloud } = useAuth();
 
   // Form state
   const [athleteId, setAthleteId] = useState<'arwel' | 'helen'>(selectedAthlete === 'helen' ? 'helen' : 'arwel');
@@ -59,7 +62,10 @@ export const WorkoutLogView: React.FC<WorkoutLogViewProps> = ({
     }
   }, []);
 
-  const handleSaveLog = (e: React.FormEvent) => {
+  // Display logs: prefer cloudLogs if signed in and available, otherwise local logs
+  const displayLogs = (currentUser && cloudLogs.length > 0) ? cloudLogs : logs;
+
+  const handleSaveLog = async (e: React.FormEvent) => {
     e.preventDefault();
     const newEntry: WorkoutLogEntry = {
       id: `log-${Date.now()}`,
@@ -71,20 +77,52 @@ export const WorkoutLogView: React.FC<WorkoutLogViewProps> = ({
       exercisesCompleted: [sessionName],
       notes
     };
+
+    // Update local state and storage
     const updated = [newEntry, ...logs];
     setLogs(updated);
     localStorage.setItem('marathon_rehab_logs', JSON.stringify(updated));
+
+    // Also persist to Firebase Firestore if signed in
+    if (currentUser) {
+      try {
+        await saveWorkoutLog(newEntry);
+      } catch (err) {
+        console.error('Failed to sync to Firestore:', err);
+      }
+    }
+
     setIsAdding(false);
     setNotes('');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const updated = logs.filter((l) => l.id !== id);
     setLogs(updated);
     localStorage.setItem('marathon_rehab_logs', JSON.stringify(updated));
+
+    if (currentUser) {
+      try {
+        await deleteWorkoutLog(id);
+      } catch (err) {
+        console.error('Failed to delete from Firestore:', err);
+      }
+    }
   };
 
-  const filteredLogs = logs.filter((l) => {
+  const handleSyncToCloud = async () => {
+    if (!currentUser || logs.length === 0) return;
+    setSyncing(true);
+    try {
+      await syncLocalLogsToCloud(logs);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const filteredLogs = displayLogs.filter((l) => {
     if (selectedAthlete === 'all') return true;
     return l.athleteId === selectedAthlete;
   });
@@ -131,6 +169,18 @@ export const WorkoutLogView: React.FC<WorkoutLogViewProps> = ({
               Helen
             </button>
           </div>
+
+          {currentUser && (
+            <button
+              onClick={handleSyncToCloud}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-700 dark:text-stone-300 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 rounded-xl transition-colors"
+              title="Sync local workout logs to your cloud Firestore database"
+            >
+              <CloudUpload className={`w-3.5 h-3.5 ${syncing ? 'animate-bounce text-amber-500' : 'text-stone-500'}`} />
+              <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync to Cloud'}</span>
+            </button>
+          )}
 
           <button
             onClick={() => setIsAdding(!isAdding)}

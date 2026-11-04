@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "WorkoutLog": {
+      "title": "WorkoutLog",
+      "description": "A recorded rehabilitation training session and pain monitoring entry for an athlete.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the workout log entry.",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the authenticated user who created the entry.",
+          "maxLength": 128
+        },
+        "athleteId": {
+          "type": "string",
+          "description": "The athlete this workout belongs to.",
+          "enum": ["arwel", "helen"]
+        },
+        "sessionName": {
+          "type": "string",
+          "description": "Name or routine title of the completed workout session.",
+          "maxLength": 200
+        },
+        "date": {
+          "type": "string",
+          "description": "ISO format date string of the session (YYYY-MM-DD).",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "prePainScore": {
+          "type": "number",
+          "description": "Pain or tightness score from 0 to 10 before starting the workout."
+        },
+        "postPainScore": {
+          "type": "number",
+          "description": "Pain or tightness score from 0 to 10 immediately after completing the workout."
+        },
+        "exercisesCompleted": {
+          "type": "array",
+          "description": "List of completed exercise names in the session."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Symptom feedback, kinetic observations, or athlete notes.",
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the record was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the record was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "athleteId",
+        "sessionName",
+        "date",
+        "prePainScore",
+        "postPainScore",
+        "exercisesCompleted"
+      ]
+    },
+    "AthleteSettings": {
+      "title": "AthleteSettings",
+      "description": "User preferences and current active athlete selection.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the authenticated user.",
+          "maxLength": 128
+        },
+        "activeAthlete": {
+          "type": "string",
+          "description": "Currently active athlete view filter.",
+          "enum": ["all", "arwel", "helen"]
+        },
+        "currentPhase": {
+          "type": "number",
+          "description": "Current active recovery phase (1, 2, or 3)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when settings were last modified."
+        }
+      },
+      "required": ["userId", "activeAthlete", "currentPhase"]
+    }
+  },
+  "firestore": {
+    "/workout_logs/{logId}": {
+      "schema": "WorkoutLog",
+      "description": "Collection of recorded rehabilitation sessions for both Arwel and Helen."
+    },
+    "/athlete_settings/{userId}": {
+      "schema": "AthleteSettings",
+      "description": "User settings and preferences for training phase and selected runner."
+    }
+  }
+}

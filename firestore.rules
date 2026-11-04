@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Helper Primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // WorkoutLog Schema & Blueprint Validation
+    function isValidWorkoutLog(data) {
+      return data.keys().hasAll(['userId', 'athleteId', 'sessionName', 'date', 'prePainScore', 'postPainScore', 'exercisesCompleted']) &&
+        data.keys().hasOnly(['id', 'userId', 'athleteId', 'sessionName', 'date', 'prePainScore', 'postPainScore', 'exercisesCompleted', 'notes', 'createdAt', 'updatedAt']) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.athleteId in ['arwel', 'helen'] &&
+        data.sessionName is string && data.sessionName.size() > 0 && data.sessionName.size() <= 200 &&
+        data.date is string && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.prePainScore is number && data.prePainScore >= 0 && data.prePainScore <= 10 &&
+        data.postPainScore is number && data.postPainScore >= 0 && data.postPainScore <= 10 &&
+        data.exercisesCompleted is list && data.exercisesCompleted.size() <= 30 &&
+        (data.exercisesCompleted.size() == 0 || data.exercisesCompleted[0] is string) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128));
+    }
+
+    // AthleteSettings Schema & Blueprint Validation
+    function isValidAthleteSettings(data) {
+      return data.keys().hasAll(['userId', 'activeAthlete', 'currentPhase']) &&
+        data.keys().hasOnly(['userId', 'activeAthlete', 'currentPhase', 'updatedAt']) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.activeAthlete in ['all', 'arwel', 'helen'] &&
+        data.currentPhase is number && data.currentPhase >= 1 && data.currentPhase <= 3;
+    }
+
+    // Workout Logs Collection
+    match /workout_logs/{logId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      
+      allow create: if isSignedIn() &&
+        isValidId(logId) &&
+        isValidWorkoutLog(incoming()) &&
+        incoming().userId == request.auth.uid;
+
+      allow update: if isSignedIn() &&
+        isValidId(logId) &&
+        isValidWorkoutLog(incoming()) &&
+        existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['sessionName', 'athleteId', 'date', 'prePainScore', 'postPainScore', 'exercisesCompleted', 'notes', 'updatedAt']);
+
+      allow delete: if isSignedIn() &&
+        isValidId(logId) &&
+        existing().userId == request.auth.uid;
+    }
+
+    // Athlete Settings Collection
+    match /athlete_settings/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidAthleteSettings(incoming()) &&
+        incoming().userId == request.auth.uid;
+
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidAthleteSettings(incoming()) &&
+        existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['activeAthlete', 'currentPhase', 'updatedAt']);
+
+      allow delete: if isSignedIn() &&
+        isValidId(userId) &&
+        isOwner(userId);
+    }
+  }
+}
