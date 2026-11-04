@@ -1,0 +1,6 @@
+{
+  "name": "Marathon Runners Strength & Rehab Hub",
+  "description": "Evidence-based strength training and injury rehabilitation plans for Auckland marathon runners Arwel Thomas and Helen Shanley, with interactive spreadsheet, video demonstrations, and session tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
